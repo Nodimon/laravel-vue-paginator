@@ -9,7 +9,7 @@
                 :page-size="pageSize"
                 :filters="filters"
                 :url="url"
-                :server="true"
+                :server-side="true"
                 :laravel-resource="true"
                 :max-pages="9"
                 @pagination-update="(event) => {records = event}"
@@ -31,6 +31,11 @@
                 pageSize: 30,
                 filters: [],
                 url: 'http://127.0.0.1:8000/api/users'
+            }
+        },
+        watch: {
+            records() {
+                // console.log("Records fetched", this.records)
             }
         }
     }

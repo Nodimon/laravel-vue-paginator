@@ -5,9 +5,6 @@
 
         <ul>
             <li :class="{'disabled' : pagination.current_page <= 1}" @click="previousPage"> < </li>
-<!--            <li @click="changePage(index)" class="page-link" :class="{active: pagination.current_page === index}" v-for="index in pagination.last_page" :key="index">-->
-<!--                {{ index }}-->
-<!--            </li>-->
             <li @click="changePage(item)" class="page-link" :class="{active: pagination.current_page === item}" v-for="(item, index) in pages" :key="index">
                 {{ item }}
             </li>
@@ -45,7 +42,7 @@
                 type: String,
                 default: ''
             },
-            server: {
+            serverSide: {
                 type: Boolean,
                 default: true
             },
@@ -67,7 +64,7 @@
         },
         methods: {
             paginationUpdate() {
-                this.$emit('pagination-update', )
+                this.$emit('pagination-update', this.result)
             },
             changePage(page) {
                 if (page === '...') return
@@ -85,15 +82,16 @@
 
                 axios.get(this.url, { params })
                     .then(({data}) => {
-                        console.log("Res", data)
+                        // console.log("Res", data)
                         if (data.data.length !== 0) {
+                            this.result = data.data
                             this.paginationUpdate()
                         }
                         this.makePagination(data)
-                        console.log("Pagination", this.pagination)
+                        // console.log("Pagination", this.pagination)
                     })
                     .catch(error => {
-                        console.log("Error", error)
+                        // console.log("Error", error)
                     })
             },
             makePagination({ meta, links }) {
@@ -113,23 +111,24 @@
                     const even = (this.maxPages % 2 === 0) ? 1 : 0
                     const leftPages = Math.floor(this.max / 2)
                     const rightPages = meta.last_page - leftPages + 1 + even
+
                     if (meta.last_page <= 6 || meta.last_page < this.maxPages) {
                         this.pages = [...this.createPages(1, meta.last_page)]
                     } else {
                         if (current >= leftPages && current <= rightPages) {
-                            console.log("If between")
-                            console.log("Left", current - 2)
-                            console.log("Right", current + 2)
+                            // console.log("If between")
+                            // console.log("Left", current - 2)
+                            // console.log("Right", current + 2)
                             this.pages = [1, '...', ...this.createPages(current - 2, current + 2), '...', meta.last_page]
                         } else {
                             this.pages = [...this.createPages(1, leftPages), '...', ...this.createPages(rightPages, meta.last_page)]
                         }
 
-                        console.log("Pages", this.pages)
-                        console.log("Current", current)
-                        console.log("Even", even)
-                        console.log("Left Pages", leftPages)
-                        console.log("Right Pages", rightPages)
+                        // console.log("Pages", this.pages)
+                        // console.log("Current", current)
+                        // console.log("Even", even)
+                        // console.log("Left Pages", leftPages)
+                        // console.log("Right Pages", rightPages)
                     }
                 }
             },
@@ -166,22 +165,23 @@
 
         li {
             padding: 5px;
-            background-color: #bdd5ff;
-            min-width: 30px;
-            min-height: 30px;
+            min-width: 25px;
+            min-height: 25px;
             margin: 0 2.5px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #fff;
+            color: cornflowerblue;
+            font-weight: 600;
+            cursor: pointer;
 
             &.active {
                 background-color: cornflowerblue;
-
+                color: #fff;
             }
 
             &.disabled {
-                background-color: red;
+                color: #bed4ff;
             }
         }
     }

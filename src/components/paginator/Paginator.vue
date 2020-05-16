@@ -1,8 +1,6 @@
 <template>
 
     <div>
-        <h1>Paginator Package</h1>
-
         <ul>
             <li :class="{'disabled' : pagination.current_page <= 1}" @click="previousPage"> < </li>
             <li @click="changePage(item)" class="page-link" :class="{active: pagination.current_page === item}" v-for="(item, index) in pages" :key="index">
@@ -53,92 +51,98 @@
             maxPages: {
                 type: Number,
                 default: 9
+            },
+            perPage: {
+                type: Number,
+                default: 5
             }
         },
         data() {
             return {
-                result: [],
                 pagination: {},
-                pages: []
+                pages: [],
+                initial: true
             }
         },
         methods: {
-            paginationUpdate() {
-                this.$emit('pagination-update', this.result)
+            paginationUpdate(records) {
+                this.$emit('pagination-update', records)
             },
             changePage(page) {
                 if (page === '...') return
-                this.makeRequest(page)
+                this.serverSide ? this.makeRequest(page) : this.paginateWhenNotAjax(page)
             },
             makeRequest(page) {
                 const params = {
                     page,
-                    orderBy: this.orderBy,
+                    orderBy:   this.orderBy,
                     direction: this.direction,
-                    filters: this.filters,
-                    search: this.search,
-                    perPage: this.perPage
+                    filters:   this.filters,
+                    search:    this.search,
+                    perPage:   this.perPage
                 }
 
                 axios.get(this.url, { params })
                     .then(({data}) => {
-                        // console.log("Res", data)
                         if (data.data.length !== 0) {
-                            this.result = data.data
-                            this.paginationUpdate()
+                            this.paginationUpdate(data.data)
                         }
-                        this.makePagination(data)
-                        // console.log("Pagination", this.pagination)
+                        const { meta, links } = data
+
+                        const pagination = {
+                            current_page: meta.current_page,
+                            last_page:    meta.last_page,
+                            total:        meta.total,
+                            next_page:    links.next,
+                            prev_page:    links.prev
+                        }
+
+                        this.makePagination(pagination)
                     })
                     .catch(error => {
-                        // console.log("Error", error)
                     })
             },
-            makePagination({ meta, links }) {
+            paginateWhenNotAjax(page) {
+                this.pagination.prev_page    = page - 1;
+                this.pagination.current_page = page;
+                this.pagination.next_page    = page + 1;
 
-                if (this.laravelResource) {
-                    this.pagination = {
-                        current_page: meta.current_page,
-                        last_page:    meta.last_page,
-                        to:           meta.to,
-                        from:         meta.from,
-                        total:        meta.total,
-                        next_page:    links.next,
-                        prev_page:    links.prev
-                    }
+                const paginated = this.records.slice((page * this.perPage) - this.perPage, page * this.perPage);
+                this.paginationUpdate(paginated)
+                this.makePagination(this.pagination)
+            },
+            makePagination(pagination) {
 
-                    const current = meta.current_page
-                    const even = (this.maxPages % 2 === 0) ? 1 : 0
-                    const leftPages = Math.floor(this.max / 2)
-                    const rightPages = meta.last_page - leftPages + 1 + even
+                this.pagination = pagination
 
-                    if (meta.last_page <= 6 || meta.last_page < this.maxPages) {
-                        this.pages = [...this.createPages(1, meta.last_page)]
+                const even       = (this.maxPages % 2 === 0) ? 1 : 0
+                const leftPages  = Math.floor(this.maxPages / 2)
+                const rightPages = pagination.last_page - leftPages + 1 + even
+
+                if (pagination.last_page <= 6 || pagination.last_page < this.maxPages) {
+                    this.pages = [...this.createPages(1, pagination.last_page)]
+                } else {
+                    if (pagination.current_page >= leftPages && pagination.current_page <= rightPages) {
+                        this.pages = [1, '...', ...this.createPages(pagination.current_page - 2, pagination.current_page + 2), '...', pagination.last_page]
                     } else {
-                        if (current >= leftPages && current <= rightPages) {
-                            // console.log("If between")
-                            // console.log("Left", current - 2)
-                            // console.log("Right", current + 2)
-                            this.pages = [1, '...', ...this.createPages(current - 2, current + 2), '...', meta.last_page]
-                        } else {
-                            this.pages = [...this.createPages(1, leftPages), '...', ...this.createPages(rightPages, meta.last_page)]
-                        }
+                        this.pages = [...this.createPages(1, leftPages), '...', ...this.createPages(rightPages, pagination.last_page)]
+                    }
+                }
 
-                        // console.log("Pages", this.pages)
-                        // console.log("Current", current)
-                        // console.log("Even", even)
-                        // console.log("Left Pages", leftPages)
-                        // console.log("Right Pages", rightPages)
+                if (!this.serverSide) {
+                    if (this.initial) {
+                        this.initial = false
+                        this.paginateWhenNotAjax(1)
                     }
                 }
             },
             previousPage() {
                 if (this.pagination.current_page <= 1) return
-                this.makeRequest(this.pagination.current_page - 1)
+                this.serverSide ? this.makeRequest(this.pagination.current_page - 1) : this.paginateWhenNotAjax(this.pagination.current_page - 1)
             },
             nextPage() {
                 if (this.pagination.current_page >= this.pagination.last_page) return
-                this.makeRequest(this.pagination.current_page + 1)
+                this.serverSide ? this.makeRequest(this.pagination.current_page + 1) : this.paginateWhenNotAjax(this.pagination.current_page + 1)
             },
             createPages(start, total) {
                 let pages = []
@@ -147,11 +151,21 @@
                 }
                 return pages
             }
-
         },
         created() {
             console.log("Props", this.$props)
-            this.makeRequest()
+            if (this.serverSide) {
+                this.makeRequest()
+            } else {
+                const pagination = {
+                    current_page: 1,
+                    last_page:    Math.ceil(this.records.length / this.perPage),
+                    total:        this.records.length,
+                    next_page:    2,
+                    prev_page:    0
+                }
+                this.makePagination(pagination)
+            }
         }
     }
 </script>
